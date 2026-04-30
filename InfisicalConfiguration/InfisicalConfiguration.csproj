@@ -9,7 +9,7 @@
     
     <PropertyGroup>
         <PackageId>Atulin.InfisicalConfiguration</PackageId>
-        <Version>0.1.1</Version>
+        <Version>0.1.2</Version>
         <Authors>Atulin</Authors>
         <PackageLicenseExpression>MIT</PackageLicenseExpression>
         <PackageReadmeFile>README.md</PackageReadmeFile>
@@ -29,6 +29,7 @@
     </ItemGroup>
     
     <ItemGroup>
+        <PackageReference Include="JetBrains.Annotations" Version="2025.2.4" />
         <PackageReference Include="Microsoft.Extensions.Configuration" Version="10.0.7" />
     </ItemGroup>
 </Project>

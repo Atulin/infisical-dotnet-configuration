@@ -1,8 +1,9 @@
 using System.Text.Json;
+using JetBrains.Annotations;
 
 namespace InfisicalConfiguration;
 
-public class MachineIdentityLogin
+internal sealed class MachineIdentityLogin
 {
 	public required string AccessToken { get; init; }
 
@@ -14,7 +15,7 @@ public class MachineIdentityLogin
 	}
 }
 
-public class SecretsList
+internal sealed class SecretsList
 {
 	public List<Secret> Secrets { get; init; } = [];
 
@@ -25,4 +26,5 @@ public class SecretsList
 	}
 }
 
-public record Secret(string Key, string Value);
+[UsedImplicitly]
+internal sealed record Secret(string SecretKey, string SecretValue);

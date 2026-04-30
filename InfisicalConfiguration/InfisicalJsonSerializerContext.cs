@@ -1,4 +1,5 @@
 ﻿using System.Text.Json.Serialization;
+using JetBrains.Annotations;
 
 namespace InfisicalConfiguration;
 
@@ -8,4 +9,5 @@ namespace InfisicalConfiguration;
 [JsonSerializable(typeof(AzureCustomProviderAuthCredentials))]
 [JsonSerializable(typeof(SecretsList))]
 [JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
-public sealed partial class InfisicalJsonContext : JsonSerializerContext;
+[UsedImplicitly]
+internal sealed partial class InfisicalJsonContext : JsonSerializerContext;

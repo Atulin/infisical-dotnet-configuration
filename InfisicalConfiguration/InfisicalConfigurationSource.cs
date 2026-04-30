@@ -2,7 +2,7 @@ using Microsoft.Extensions.Configuration;
 
 namespace InfisicalConfiguration;
 
-public class InfisicalConfigurationSource(InfisicalConfig config) : IConfigurationSource
+internal class InfisicalConfigurationSource(InfisicalConfig config) : IConfigurationSource
 {
   public IConfigurationProvider Build(IConfigurationBuilder builder)
   {

@@ -136,8 +136,8 @@ public class InfisicalConfigurationProvider : ConfigurationProvider
 			var secrets = SecretsList.Deserialize(content);
 			
 			var allSecrets = secrets.Secrets.Select(secret => new KeyValuePair<string, string>(
-				secret.Key,
-				secret.Value
+				secret.SecretKey,
+				secret.SecretValue
 			)).ToList();
 
 			allSecrets.Reverse();
