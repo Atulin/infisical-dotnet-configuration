@@ -1,10 +1,27 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <TargetFramework>net8.0</TargetFramework>
+        <TargetFramework>net10.0</TargetFramework>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
+        <LangVersion>14</LangVersion>
+    </PropertyGroup>
+    
+    <PropertyGroup>
+        <PackageId>Atulin.InfisicalConfiguration</PackageId>
+        <Version>0.1.0</Version>
+        <Authors>Atulin</Authors>
+        <PackageLicenseExpression>MIT</PackageLicenseExpression>
         <PackageReadmeFile>README.md</PackageReadmeFile>
+        <RepositoryType>git</RepositoryType>
+        <PackageTags>config;iconfiguration;ioptions;options;infisical;</PackageTags>
+        
+        <PublishRepositoryUrl>true</PublishRepositoryUrl>
+        <EmbedUntrackedSources>true</EmbedUntrackedSources>
+        <IncludeSymbols>true</IncludeSymbols>
+        <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
     </PropertyGroup>
 
     <ItemGroup>
@@ -12,11 +29,6 @@
     </ItemGroup>
     
     <ItemGroup>
-        <PackageReference Include="BouncyCastle.Cryptography" Version="2.3.1" />
-        <PackageReference Include="coverlet.collector" Version="6.0.0">
-          <PrivateAssets>all</PrivateAssets>
-          <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-        </PackageReference>
-        <PackageReference Include="Microsoft.Extensions.Configuration" Version="8.0.0" />
+        <PackageReference Include="Microsoft.Extensions.Configuration" Version="10.0.7" />
     </ItemGroup>
 </Project>

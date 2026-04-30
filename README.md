@@ -1,13 +1,13 @@
-# Infisical.IConfigurationProvider
+# Atulin.InfisicalConfiguration
 
 This is a .NET library that makes it easy to use the [.NET configuration system](https://learn.microsoft.com/en-us/aspnet/core/fundamentals/configuration/?view=aspnetcore-7.0) with [Infisical](https://infisical.com/).
 
-[![Nuget](https://img.shields.io/nuget/dt/Infisical.IConfigurationProvider)](https://www.nuget.org/packages/Infisical.IConfigurationProvider)
+[![Nuget](https://img.shields.io/nuget/dt/Atulin.InfisicalConfiguration)](https://www.nuget.org/packages/Atulin.InfisicalConfiguration)
 
 ## Installation
 
 ```shell
-dotnet add package Infisical.IConfigurationProvider
+dotnet add package Atulin.InfisicalConfiguration
 ```
 
 ## Example usage
@@ -26,6 +26,7 @@ builder.Configuration
             .SetEnvironment("<env-slug>")
             .SetSecretPath("<secret-path>") // Optional, defaults to "/"
             .SetInfisicalUrl("https://infisical-instance.com") // Optional, defaults to https://infisical.com
+            .SetExpandSecretReferences(false) // Optional, defaults to true
             .SetAuth(
                 new InfisicalAuthBuilder()
                     .SetUniversalAuth(

@@ -1,187 +1,169 @@
 using System.Net.Http.Headers;
-using System.Text;
-using System.Text.Json;
-using System.Text.RegularExpressions;
+using System.Net.Http.Json;
 using Microsoft.Extensions.Configuration;
-using Org.BouncyCastle.Crypto.Engines;
-using Org.BouncyCastle.Crypto.Modes;
-using Org.BouncyCastle.Crypto.Parameters;
-using Org.BouncyCastle.Security;
 
 namespace InfisicalConfiguration;
 
 public class InfisicalConfigurationProvider : ConfigurationProvider
 {
-  private readonly HttpClient _httpClient;
-  private Dictionary<string, string> _secretsCache = new();
+	private readonly HttpClient _httpClient;
+	private readonly Dictionary<string, string> _secretsCache = new();
 
-  private string _accessToken;
-
-  private readonly InfisicalConfig _config;
+	private readonly InfisicalConfig _config;
 
 
-  public InfisicalConfigurationProvider(InfisicalConfig config)
-  {
-    _config = config;
-    _httpClient = new HttpClient();
+	public InfisicalConfigurationProvider(InfisicalConfig config)
+	{
+		_config = config;
+		_httpClient = new HttpClient();
 
-    _accessToken = Authenticate();
+		var accessToken = Authenticate();
 
-    _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _accessToken);
-    _httpClient.BaseAddress = new Uri(_config.InfisicalUrl);
-  }
+		_httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+		_httpClient.BaseAddress = new Uri(_config.InfisicalUrl);
+	}
 
-  private string Authenticate()
-  {
+	private string Authenticate()
+	{
+		var auth = _config.Auth;
 
-    var auth = _config.Auth;
+		if (auth is null)
+		{
+			throw new InvalidOperationException("Auth details not provided");
+		}
 
-    if (auth is null)
-    {
-      throw new InvalidOperationException("Auth details not provided");
-    }
+		var authMethod = auth.GetAuthMethod();
+		if (authMethod == InfisicalAuthType.Universal)
+		{
+			return UniversalAuthLogin();
+		}
 
-    var authMethod = auth.GetAuthMethod();
-    if (authMethod == InfisicalAuthType.Universal)
-    {
-      return UniversalAuthLogin();
-    }
+		if (authMethod == InfisicalAuthType.AzureCustomProvider)
+		{
+			return AzureAuthLogin();
+		}
 
-    if (authMethod == InfisicalAuthType.AzureCustomProvider)
-    {
-      return AzureAuthLogin();
-    }
+		throw new InvalidOperationException("AuthType must be set. Are you missing a call to SetUniversalAuth?");
+	}
 
-    throw new InvalidOperationException("AuthType must be set. Are you missing a call to SetUniversalAuth?");
-  }
+	private string UniversalAuthLogin()
+	{
+		var auth = _config.Auth;
 
-  private string UniversalAuthLogin()
-  {
+		if (auth is null)
+		{
+			throw new InvalidOperationException("Auth details not provided");
+		}
+		var universalAuth = auth.GetUniversalAuth();
 
-    var auth = _config.Auth;
+		var body = new
+		{
+			clientId = universalAuth.ClientId,
+			clientSecret = universalAuth.ClientSecret
+		};
 
-    if (auth is null)
-    {
-      throw new InvalidOperationException("Auth details not provided");
-    }
-    var universalAuth = auth.GetUniversalAuth();
+		var infisicalUrl = _config.InfisicalUrl;
 
-    var body = new
-    {
-      clientId = universalAuth.ClientId,
-      clientSecret = universalAuth.ClientSecret
-    };
+		var url = $"{infisicalUrl}/api/v1/auth/universal-auth/login";
 
-    var bodyJson = JsonSerializer.Serialize(body);
-    var content = new StringContent(bodyJson, Encoding.UTF8, "application/json");
+		var response = new HttpClient().PostAsJsonAsync(url, body).GetAwaiter().GetResult();
 
-    var infisicalUrl = _config.InfisicalUrl;
+		response.EnsureSuccessStatusCode();
 
-    var url = $"{infisicalUrl}/api/v1/auth/universal-auth/login";
+		var machineIdentityLogin = MachineIdentityLogin.Deserialize(
+			response.Content.ReadAsStringAsync().GetAwaiter().GetResult()
+		);
 
-    var response = new HttpClient().PostAsync(url, content).GetAwaiter().GetResult();
+		return machineIdentityLogin.AccessToken;
+	}
 
-    response.EnsureSuccessStatusCode();
+	private string AzureAuthLogin()
+	{
+		var auth = _config.Auth;
 
-    var machineIdentityLogin = MachineIdentityLogin.Deserialize(
-      response.Content.ReadAsStringAsync().GetAwaiter().GetResult()
-    );
+		if (auth is null)
+		{
+			throw new InvalidOperationException("Auth details not provided");
+		}
+		var azureAuth = auth.GetAzureCustomProviderAuth();
 
-    return machineIdentityLogin.AccessToken;
-  }
+		var body = new
+		{
+			identityId = azureAuth.IdentityId,
+			jwt = azureAuth.TokenProvider().GetAwaiter().GetResult()
+		};
 
-  private string AzureAuthLogin()
-  {
-    var auth = _config.Auth;
+		var response = new HttpClient().PostAsJsonAsync(
+			$"{_config.InfisicalUrl}/api/v1/auth/azure-auth/login",
+			body
+		).GetAwaiter().GetResult();
 
-    if (auth is null)
-    {
-      throw new InvalidOperationException("Auth details not provided");
-    }
-    var azureAuth = auth.GetAzureCustomProviderAuth();
+		response.EnsureSuccessStatusCode();
 
-    var body = new
-    {
-      identityId = azureAuth.IdentityId,
-      jwt = azureAuth.TokenProvider().GetAwaiter().GetResult()
-    };
+		var machineIdentityLogin = MachineIdentityLogin.Deserialize(
+			response.Content.ReadAsStringAsync().GetAwaiter().GetResult()
+		);
 
-    var bodyJson = JsonSerializer.Serialize(body);
-    var content = new StringContent(bodyJson, Encoding.UTF8, "application/json");
+		return machineIdentityLogin.AccessToken;
+	}
 
-    var response = new HttpClient().PostAsync(
-      $"{_config.InfisicalUrl}/api/v1/auth/azure-auth/login",
-      content
-    ).GetAwaiter().GetResult();
+	public override void Load()
+	{
+		var task = LoadAsync();
+		task.GetAwaiter().GetResult();
+		
+		if (task.Exception is null) return;
+		
+		if (task.Exception.InnerException is not null)
+		{
+			throw task.Exception.InnerException;
+		}
 
-    response.EnsureSuccessStatusCode();
+		throw task.Exception;
+	}
 
-    var machineIdentityLogin = MachineIdentityLogin.Deserialize(
-      response.Content.ReadAsStringAsync().GetAwaiter().GetResult()
-    );
+	private async Task LoadAsync()
+	{
+		try
+		{
+			var prefix = _config.Prefix;
 
-    return machineIdentityLogin.AccessToken;
-  }
+			var url = $"{_config.InfisicalUrl}/api/v3/secrets/raw/?environment={_config.Environment}&workspaceId={_config.ProjectId}&secretPath={_config.SecretPath}&include_imports=true&expandSecretReferences={_config.ExpandSecretReferences}";
 
-  public override void Load()
-  {
-    var task = LoadAsync();
-    task.GetAwaiter().GetResult();
-    if (task.Exception is not null)
-    {
-      if (task.Exception.InnerException is not null)
-      {
-        throw task.Exception.InnerException;
-      }
-
-      throw task.Exception;
-    }
-  }
-
-  private async Task LoadAsync()
-  {
-    try
-    {
-
-      var prefix = _config.Prefix ?? "";
-
-      var url = $"{_config.InfisicalUrl}/api/v3/secrets/raw/?environment={_config.Environment}&workspaceId={_config.ProjectId}&secretPath={_config.SecretPath}&include_imports=true";
-
-      var response = await _httpClient.GetAsync(url);
-      var content = await response.Content.ReadAsStringAsync();
-      response.EnsureSuccessStatusCode();
-      var secrets = SecretsList.Deserialize(content);
+			var response = await _httpClient.GetAsync(url);
+			var content = await response.Content.ReadAsStringAsync();
+			response.EnsureSuccessStatusCode();
+			var secrets = SecretsList.Deserialize(content);
 
 
-      var allSecrets = secrets.Secrets.Select(
-          secret => new KeyValuePair<string, string>(
-              secret.SecretKey,
-              secret.SecretValue
-          )).ToList();
+			var allSecrets = secrets.Secrets.Select(secret => new KeyValuePair<string, string>(
+				secret.Key,
+				secret.Value
+			)).ToList();
 
-      allSecrets.Reverse();
-      _secretsCache.Clear();
+			allSecrets.Reverse();
+			_secretsCache.Clear();
 
-      foreach (var secret in allSecrets)
-      {
-        _secretsCache[secret.Key] = secret.Value;
-      }
+			foreach (var secret in allSecrets)
+			{
+				_secretsCache[secret.Key] = secret.Value;
+			}
 
-      foreach (var secret in _secretsCache)
-      {
-        var key = prefix + secret.Key.Replace("__", ":");
-        Data.Add(key, secret.Value);
-      }
-    }
-    catch
-    {
-      foreach (var secret in _secretsCache)
-      {
-        Data.Add(secret.Key, secret.Value);
-      }
+			foreach (var secret in _secretsCache)
+			{
+				var key = prefix + secret.Key.Replace("__", ":");
+				Data.Add(key, secret.Value);
+			}
+		}
+		catch
+		{
+			foreach (var secret in _secretsCache)
+			{
+				Data.Add(secret.Key, secret.Value);
+			}
 
-      throw;
-    }
-  }
+			throw;
+		}
+	}
 
 }
