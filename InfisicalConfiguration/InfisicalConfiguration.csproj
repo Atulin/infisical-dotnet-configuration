@@ -9,7 +9,7 @@
     
     <PropertyGroup>
         <PackageId>Atulin.InfisicalConfiguration</PackageId>
-        <Version>0.1.0</Version>
+        <Version>0.1.1</Version>
         <Authors>Atulin</Authors>
         <PackageLicenseExpression>MIT</PackageLicenseExpression>
         <PackageReadmeFile>README.md</PackageReadmeFile>
