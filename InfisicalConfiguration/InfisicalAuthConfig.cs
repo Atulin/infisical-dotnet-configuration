@@ -1,8 +1,8 @@
 namespace InfisicalConfiguration;
 
-public sealed record UniversalAuthCredentials(string ClientId, string ClientSecret);
+internal sealed record UniversalAuthCredentials(string ClientId, string ClientSecret);
 
-public class AzureCustomProviderAuthCredentials
+internal class AzureCustomProviderAuthCredentials
 {
 	public string IdentityId { get; }
 	public Func<Task<string>> TokenProvider { get; }
@@ -19,27 +19,25 @@ public class AzureCustomProviderAuthCredentials
 	}
 }
 
-public enum InfisicalAuthType
+internal enum InfisicalAuthType
 {
 	Universal,
 	AzureCustomProvider,
 }
 
+/// <summary>
+/// Represents the authentication configuration for connecting to Infisical.
+/// Instances are created using <see cref="InfisicalAuthBuilder"/>.
+/// </summary>
 public class InfisicalAuth
 {
-	private InfisicalAuthType AuthType { get; set; }
+	internal InfisicalAuthType AuthType { get; private set; }
 	private UniversalAuthCredentials? _universalAuthCredentials;
 	private AzureCustomProviderAuthCredentials? _azureCustomProviderAuthCredentials;
-
-
+	
 	internal InfisicalAuth() {}
 
-	public InfisicalAuthType GetAuthMethod()
-	{
-		return AuthType;
-	}
-
-	public UniversalAuthCredentials GetUniversalAuth()
+	internal UniversalAuthCredentials GetUniversalAuth()
 	{
 		if (_universalAuthCredentials == null)
 		{
@@ -54,7 +52,7 @@ public class InfisicalAuth
 		throw new InvalidOperationException("AuthType must be set. Are you missing a call to SetUniversalAuth?");
 	}
 
-	public AzureCustomProviderAuthCredentials GetAzureCustomProviderAuth()
+	internal AzureCustomProviderAuthCredentials GetAzureCustomProviderAuth()
 	{
 		if (_azureCustomProviderAuthCredentials == null)
 		{
@@ -82,16 +80,36 @@ public class InfisicalAuth
 	}
 }
 
+/// <summary>
+/// A fluent builder for constructing <see cref="InfisicalAuth"/> instances.
+/// Exactly one authentication method must be configured before calling <see cref="Build"/>.
+/// </summary>
 public class InfisicalAuthBuilder
 {
 	private readonly InfisicalAuth _auth = new();
 
+	/// <summary>
+	/// Configures Universal Auth as the authentication method.
+	/// </summary>
+	/// <param name="clientId">The client ID of your universal auth machine identity.</param>
+	/// <param name="clientSecret">The client secret of your universal auth machine identity.</param>
+	/// <returns>This builder instance for method chaining.</returns>
 	public InfisicalAuthBuilder SetUniversalAuth(string clientId, string clientSecret)
 	{
 		_auth.SetUniversalAuthCredentials(new UniversalAuthCredentials(clientId, clientSecret));
 		return this;
 	}
 
+	/// <summary>
+	/// Configures Azure (Entra ID) as the authentication method using a custom token provider.
+	/// </summary>
+	/// <param name="identityId">The ID of the Infisical identity to authenticate with.</param>
+	/// <param name="tokenProvider">An async function that returns an Entra ID JWT token.
+	/// This token will be exchanged with Infisical for an access token.</param>
+	/// <returns>This builder instance for method chaining.</returns>
+	/// <exception cref="InvalidOperationException">
+	/// Thrown when <paramref name="identityId"/> is null or empty, or <paramref name="tokenProvider"/> is null.
+	/// </exception>
 	public InfisicalAuthBuilder SetAzureAuth(string identityId, Func<Task<string>> tokenProvider)
 	{
 		if (string.IsNullOrEmpty(identityId))
@@ -108,9 +126,17 @@ public class InfisicalAuthBuilder
 		return this;
 	}
 
+	/// <summary>
+	/// Validates the configured authentication and builds an <see cref="InfisicalAuth"/> instance.
+	/// </summary>
+	/// <returns>A configured <see cref="InfisicalAuth"/> instance.</returns>
+	/// <exception cref="InvalidOperationException">
+	/// Thrown when no authentication method has been configured, or when the configured
+	/// credentials are incomplete.
+	/// </exception>
 	public InfisicalAuth Build()
 	{
-		switch (_auth.GetAuthMethod())
+		switch (_auth.AuthType)
 		{
 			case InfisicalAuthType.Universal:
 				var universalAuth = _auth.GetUniversalAuth();

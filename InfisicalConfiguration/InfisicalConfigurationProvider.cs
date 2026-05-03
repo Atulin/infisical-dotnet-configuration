@@ -4,7 +4,7 @@ using Microsoft.Extensions.Configuration;
 
 namespace InfisicalConfiguration;
 
-public class InfisicalConfigurationProvider : ConfigurationProvider
+internal class InfisicalConfigurationProvider : ConfigurationProvider, IDisposable
 {
 	private readonly HttpClient _httpClient;
 	private readonly Dictionary<string, string> _secretsCache = new();
@@ -15,12 +15,15 @@ public class InfisicalConfigurationProvider : ConfigurationProvider
 	public InfisicalConfigurationProvider(InfisicalConfig config)
 	{
 		_config = config;
-		_httpClient = new HttpClient();
+
+		_httpClient = new HttpClient(new SocketsHttpHandler())
+		{
+			BaseAddress = new Uri(_config.InfisicalUrl)
+		};
 
 		var accessToken = Authenticate();
 
 		_httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
-		_httpClient.BaseAddress = new Uri(_config.InfisicalUrl);
 	}
 
 	private string Authenticate()
@@ -32,18 +35,13 @@ public class InfisicalConfigurationProvider : ConfigurationProvider
 			throw new InvalidOperationException("Auth details not provided");
 		}
 
-		var authMethod = auth.GetAuthMethod();
-		if (authMethod == InfisicalAuthType.Universal)
+		return auth.AuthType switch
 		{
-			return UniversalAuthLogin();
-		}
+			InfisicalAuthType.Universal => UniversalAuthLogin(),
+			InfisicalAuthType.AzureCustomProvider => AzureAuthLogin(),
+			_ => throw new InvalidOperationException("AuthType must be set. Are you missing a call to SetUniversalAuth?")
+		};
 
-		if (authMethod == InfisicalAuthType.AzureCustomProvider)
-		{
-			return AzureAuthLogin();
-		}
-
-		throw new InvalidOperationException("AuthType must be set. Are you missing a call to SetUniversalAuth?");
 	}
 
 	private string UniversalAuthLogin()
@@ -62,11 +60,9 @@ public class InfisicalConfigurationProvider : ConfigurationProvider
 			clientSecret = universalAuth.ClientSecret
 		};
 
-		var infisicalUrl = _config.InfisicalUrl;
+		const string url = "/api/v1/auth/universal-auth/login";
 
-		var url = $"{infisicalUrl}/api/v1/auth/universal-auth/login";
-
-		var response = new HttpClient().PostAsJsonAsync(url, body).GetAwaiter().GetResult();
+		var response = _httpClient.PostAsJsonAsync(url, body).GetAwaiter().GetResult();
 
 		response.EnsureSuccessStatusCode();
 
@@ -93,8 +89,8 @@ public class InfisicalConfigurationProvider : ConfigurationProvider
 			jwt = azureAuth.TokenProvider().GetAwaiter().GetResult()
 		};
 
-		var response = new HttpClient().PostAsJsonAsync(
-			$"{_config.InfisicalUrl}/api/v1/auth/azure-auth/login",
+		var response = _httpClient.PostAsJsonAsync(
+			"/api/v1/auth/azure-auth/login",
 			body
 		).GetAwaiter().GetResult();
 
@@ -128,41 +124,40 @@ public class InfisicalConfigurationProvider : ConfigurationProvider
 		{
 			var prefix = _config.Prefix;
 
-			var url = $"{_config.InfisicalUrl}/api/v3/secrets/raw/?environment={_config.Environment}&workspaceId={_config.ProjectId}&secretPath={_config.SecretPath}&include_imports=true&expandSecretReferences={_config.ExpandSecretReferences.ToString().ToLower()}";
+			var url = $"/api/v3/secrets/raw/?environment={_config.Environment}&workspaceId={_config.ProjectId}&secretPath={_config.SecretPath}&include_imports=true&expandSecretReferences={_config.ExpandSecretReferences.ToString().ToLower()}";
 
 			var response = await _httpClient.GetAsync(url);
 			var content = await response.Content.ReadAsStringAsync();
 			response.EnsureSuccessStatusCode();
 			var secrets = SecretsList.Deserialize(content);
-			
-			var allSecrets = secrets.Secrets.Select(secret => new KeyValuePair<string, string>(
-				secret.SecretKey,
-				secret.SecretValue
-			)).ToList();
-
-			allSecrets.Reverse();
+	
+			secrets.Secrets.Reverse();
 			_secretsCache.Clear();
 
-			foreach (var secret in allSecrets)
+			foreach (var secret in secrets.Secrets)
 			{
-				_secretsCache[secret.Key] = secret.Value;
+				_secretsCache[secret.SecretKey] = secret.SecretValue;
 			}
 
 			foreach (var secret in _secretsCache)
 			{
 				var key = prefix + secret.Key.Replace("__", ":");
-				Data.Add(key, secret.Value);
+				Data[key] = secret.Value;
 			}
 		}
 		catch
 		{
 			foreach (var secret in _secretsCache)
 			{
-				Data.Add(secret.Key, secret.Value);
+				Data[secret.Key] = secret.Value;
 			}
 
 			throw;
 		}
 	}
 
+	public void Dispose()
+	{
+		_httpClient.Dispose();
+	}
 }

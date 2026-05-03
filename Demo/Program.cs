@@ -29,4 +29,4 @@ var cfg = new ConfigurationBuilder()
 	.AddInfisical(config)
 	.Build();
 
-Console.WriteLine(JsonSerializer.Serialize(cfg));
+Console.WriteLine(JsonSerializer.Serialize(cfg.AsEnumerable().ToArray(), new JsonSerializerOptions { WriteIndented = true }));
