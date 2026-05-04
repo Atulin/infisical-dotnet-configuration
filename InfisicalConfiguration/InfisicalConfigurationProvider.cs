@@ -16,7 +16,7 @@ internal class InfisicalConfigurationProvider : ConfigurationProvider, IDisposab
 	{
 		_config = config;
 
-		_httpClient = new HttpClient(new SocketsHttpHandler())
+		_httpClient = new HttpClient
 		{
 			BaseAddress = new Uri(_config.InfisicalUrl)
 		};
