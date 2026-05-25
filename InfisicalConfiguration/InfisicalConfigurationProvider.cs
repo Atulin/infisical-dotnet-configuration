@@ -62,12 +62,15 @@ internal class InfisicalConfigurationProvider : ConfigurationProvider, IDisposab
 
 		const string url = "/api/v1/auth/universal-auth/login";
 
-		var response = _httpClient.PostAsJsonAsync(url, body).GetAwaiter().GetResult();
+		var response = _httpClient.Send(new HttpRequestMessage(HttpMethod.Post, url)
+		{
+			Content = JsonContent.Create(body)
+		});
 
 		response.EnsureSuccessStatusCode();
 
 		var machineIdentityLogin = MachineIdentityLogin.Deserialize(
-			response.Content.ReadAsStringAsync().GetAwaiter().GetResult()
+			response.Content.ReadAsString()
 		);
 
 		return machineIdentityLogin.AccessToken;
@@ -89,15 +92,15 @@ internal class InfisicalConfigurationProvider : ConfigurationProvider, IDisposab
 			jwt = azureAuth.TokenProvider().GetAwaiter().GetResult()
 		};
 
-		var response = _httpClient.PostAsJsonAsync(
-			"/api/v1/auth/azure-auth/login",
-			body
-		).GetAwaiter().GetResult();
+		var response = _httpClient.Send(new HttpRequestMessage(HttpMethod.Post, "/api/v1/auth/azure-auth/login")
+		{
+			Content = JsonContent.Create(body)
+		});
 
 		response.EnsureSuccessStatusCode();
 
 		var machineIdentityLogin = MachineIdentityLogin.Deserialize(
-			response.Content.ReadAsStringAsync().GetAwaiter().GetResult()
+			response.Content.ReadAsString()
 		);
 
 		return machineIdentityLogin.AccessToken;
@@ -105,29 +108,15 @@ internal class InfisicalConfigurationProvider : ConfigurationProvider, IDisposab
 
 	public override void Load()
 	{
-		var task = LoadAsync();
-		task.GetAwaiter().GetResult();
-		
-		if (task.Exception is null) return;
-		
-		if (task.Exception.InnerException is not null)
-		{
-			throw task.Exception.InnerException;
-		}
-
-		throw task.Exception;
-	}
-
-	private async Task LoadAsync()
-	{
 		try
 		{
 			var prefix = _config.Prefix;
 
 			var url = $"/api/v3/secrets/raw/?environment={_config.Environment}&workspaceId={_config.ProjectId}&secretPath={_config.SecretPath}&include_imports=true&expandSecretReferences={_config.ExpandSecretReferences.ToString().ToLower()}";
 
-			var response = await _httpClient.GetAsync(url);
-			var content = await response.Content.ReadAsStringAsync();
+			// ReSharper disable once MethodHasAsyncOverload
+			var response = _httpClient.Send(new HttpRequestMessage(HttpMethod.Get, url));
+			var content = response.Content.ReadAsString();
 			response.EnsureSuccessStatusCode();
 			var secrets = SecretsList.Deserialize(content);
 	
